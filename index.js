@@ -104,26 +104,29 @@ const resolvers = {
 
 const server = new ApolloServer({ typeDefs: schema, resolvers });
 
+const setupApolloServer = () =>
+  startStandaloneServer(server, {
+    listen: { port: 4040 },
+    context: async ({ req }) => {
+      if (req.headers.authorization) {
+        const token = req.headers.authorization.split(" ")[1];
+
+        if (token) {
+          const { id } = jwt.verify(token, process.env.JWT_SECRET);
+          const user = await Author.findById(id);
+
+          return { user };
+        }
+      }
+    },
+  });
+
 mongoose
   .connect(process.env.DB_URI)
   .then(() => {
     console.log("✨Database connected");
 
-    return startStandaloneServer(server, {
-      listen: { port: 4040 },
-      context: async ({ req }) => {
-        if (req.headers.authorization) {
-          const token = req.headers.authorization.split(" ")[1];
-
-          if (token) {
-            const { id } = jwt.verify(token, process.env.JWT_SECRET);
-            const user = await Author.findById(id);
-
-            return { user };
-          }
-        }
-      },
-    });
+    return setupApolloServer();
   })
   .then(({ url }) => {
     console.log(`✨Server ready at ${url}`);
